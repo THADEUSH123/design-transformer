@@ -10,7 +10,6 @@ import reports
 
 def get_user_general_choice(prompt, default_choice, valid_options):
     """Prompt user to select a general menu option."""
-    print('d11111')
     while True:
         choice = raw_input(prompt.format(default_choice)) or default_choice
         if choice in valid_options:
