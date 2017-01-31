@@ -6,11 +6,11 @@ This repo contains tooling to manage the transformation of planning and design d
 ##Data Input
 There are three input formats this tooling supports. This tooling allows a user to visualize and consume arbitrary site and link data in aggregate. The tooling can consume an arbitrary number of the above formatted text files and output in a standardized output.
 
-1. .csv files[(Comma Separated Delimiter Format)](https://en.wikipedia.org/wiki/CSV): contain a list of attributes of sites(lat/long mandatory).
+1. .csv files[(Comma Separated Delimiter Format)](https://en.wikipedia.org/wiki/CSV): contain a list of attributes of sites (lat/long mandatory).
 
 2. .gv files[(Graph Viz Format)](https://en.wikipedia.org/wiki/DOT_(graph_description_language)): contain an association of sites.
 
-3. .geojson/json[(GeoJSON format)](https://en.wikipedia.org/wiki/GeoJSON): can contain any geospasial data.
+3. .geojson/json[(GeoJSON format)](https://en.wikipedia.org/wiki/GeoJSON): can contain any geospatial data.
 
 
 ###CSV Input File Details
@@ -45,7 +45,7 @@ site_id,   latitude,       longitude,       data_weight,    description,     oth
 
 All connections in gv files relate to a **site_id** defined in other files.  
 
-EXAMPL FORMAT
+EXAMPLE FORMAT
 ```
 graph example_format {
 
