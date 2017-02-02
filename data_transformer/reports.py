@@ -163,7 +163,7 @@ def material_requirements_report(sites):
             '{client_devices} client node devices required.\n'
             '{odroids} odroid devices required.\n\n'
             '**This report only includes information for sites with data '
-            'included and the folowing sites do not have a "bill_of_materials"'
+            'included and the following sites do not have a "bill_of_materials"'
             ' field defining a hardware BOM.\n {num_sites_missing_data}'
             ' of {total_sites} sites are MISSING this data.'
             ''.format(primary_devices=complete_bom['primary_devices'],
