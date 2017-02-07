@@ -6,6 +6,16 @@ Import/Export feature properties in misc formats.
 import datastore
 import os
 import reports
+import signal
+import sys
+
+
+def signal_handler(signal, frame):
+    """Exit cleanly when SIGINT is received"""
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def get_user_general_choice(prompt, default_choice, valid_options):
@@ -15,7 +25,7 @@ def get_user_general_choice(prompt, default_choice, valid_options):
         if choice in valid_options:
             return choice
         else:
-            print('   Invalid selection.')
+            print('Invalid selection.')
 
 
 import_valid_options = ['1', '2', '3']
@@ -33,7 +43,6 @@ export_prompt = ('\n============EXPORT MENU================='
                  '\n2 => Change destination folder'
                  '\n3 => Do not save in additional formats/locations'
                  '\nEnter choice[{}]: ')
-
 
 main_valid_options = ['1', '2', '3']
 main_prompt = ('\n============MAIN MENU================='
@@ -55,13 +64,13 @@ def import_menu(datastore, folder, file_path=None, choice='1'):
             while True:
                 decision = raw_input('Import {}?[Y/n]'.format(f)) or 'y'
                 if decision.lower() not in ['y', 'n']:
-                    print('   Invalid selection')
+                    print('Invalid selection')
                     continue
                 elif decision.lower() == 'y':
-                    print('   Adding file to import list')
+                    print('Adding file to import list')
                     break
                 elif decision.lower() == 'n':
-                    print('   Removing file from import list')
+                    print('Removing file from import list')
                     files.remove(f)
                     break
         return files
@@ -75,16 +84,27 @@ def import_menu(datastore, folder, file_path=None, choice='1'):
             folder = raw_input(folder_prompt) or folder
             files_names = get_user_file_choices(os.listdir(folder))
             datastore.import_all_files(folder, files_names)
+            break
+
         elif choice is '2':
-            file_prompt = 'Enter file name[{}]: '.format(file_path)
-            file_path = raw_input(file_prompt) or file_path
-            datastore.import_files(os.path.dirname(file_path),
-                                   [os.path.basename(file_path)])
+            while True:
+                file_prompt = 'Enter file name[{}]: '.format(file_path)
+                file_path = raw_input(file_prompt) or file_path
+
+                if file_path is None:
+                    print('Enter legit file path or \'q\' to quit')
+                elif file_path == 'q':
+                    break
+                elif os.path.isfile(file_path):
+                    datastore.import_all_files(os.path.dirname(file_path),
+                                           [os.path.basename(file_path)])
+                    break
+                else:
+                    print('Enter legit file path')
+            break
 
         elif choice is '3':
             break
-
-        choice = '3'
 
 
 def export_menu(datastore, folder='exports', choice='1'):
@@ -99,17 +119,15 @@ def export_menu(datastore, folder='exports', choice='1'):
             reports.export_all_files(to_folder=folder,
                                      sites=datastore.sites,
                                      links=datastore.links)
-            choice = '3'
+            break
 
         if choice is '2':
             folder_prompt = 'Enter folder name[{}]: '.format(folder)
             folder = raw_input(folder_prompt) or folder
-            choice = '1'
+            break
 
         if choice is '3':
             break
-
-        choice = '3'
 
 
 def main():
@@ -130,12 +148,12 @@ def main():
             choice = '3'
 
         elif choice is '3':
-            exit()
+            sys.exit(0)
 
         else:
             print('Invalid choice')
 
-        print('\n' * 2)
+        print('\n' * 1)
 
 
 if __name__ == '__main__':

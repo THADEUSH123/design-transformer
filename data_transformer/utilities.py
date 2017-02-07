@@ -35,9 +35,9 @@ def distance(source_coordinates, destination_coordinates):
     radius = 6371 * 1000  # radius of earth in meters
     dlat = radians(lat2 - lat1)
     dlon = radians(long2 - long1)
-    a = sin(dlat / 2) * sin(dlat / 2) \
-        + cos(radians(lat1)) * cos(radians(lat2)) \
-        * sin(dlon / 2) * sin(dlon / 2)
+    a = (sin(dlat / 2) * sin(dlat / 2)
+         + cos(radians(lat1)) * cos(radians(lat2))
+         * sin(dlon / 2) * sin(dlon / 2))
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     d = radius * c
     return float('{:.1f}'.format(d))
