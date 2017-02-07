@@ -12,7 +12,7 @@ config = {
     'url': 'https://github.com/THADEUSH123/design-transformer',
     'download_url': 'https://github.com/THADEUSH123/design-transformer',
     'author_email': 'thadeus.hickman@gmail.com',
-    'version': '0.1',
+    'version': '0.2',
     'install_requires': ['nose', 'geojson', 'pykml',
                          'simplejson', 'pydot'],
     'packages': ['data_transformer'],

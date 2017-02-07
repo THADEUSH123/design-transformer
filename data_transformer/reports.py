@@ -16,6 +16,9 @@ import os
 
 def export_all_files(to_folder, sites, links):
     """Wrap all other report functions for exporting files."""
+    # TODO: Refactor the as_geojson to align with the new classes in datastore.
+    sites = [s.as_geojson() for s in sites]
+    links = [l.as_geojson() for l in links]
     current_date = datetime.datetime.now().strftime('%Y-%m-%d')
     folder_path = os.path.join(to_folder, current_date)
     if not os.path.exists(folder_path):

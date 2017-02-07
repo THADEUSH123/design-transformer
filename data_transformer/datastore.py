@@ -6,136 +6,109 @@ versa. Also provides helper functions to manage Feature objects.
 """
 import csv
 import geojson
-import features
 import utilities
 import os
 import pydot
 
 
-class Datastore(object):
+class Datastore(dict):
     """
     Manage data from local files and online files in a pythonic way.
 
     The Datastore class manages deployment data and exposes the data in
-    native python objects(geojson.Features). The class can be extended to
-    support various file types and repositories.
+    native python objects thatgeojson. The class could be extended to
+    support database repositories.
 
     """
 
     def __init__(self):
-        """init geojson.Features that are stored in the Datastore class."""
-        self._data = {}
-        self._weighting = {}
+        """Initilize the the Datastore class."""
+        super(Datastore, self).__init__()
 
-    def __getattr__(self, name):
-        """Return geospatial data in the Datastore class.
+    @property
+    def sites(self):
+        """Return all sites in the datastore."""
+        return [f for f in self.values() if isinstance(f, Site)]
 
-        Perform simple filtering of object types for easy manipultion.
-        Always return a list of data of the specific type.
-        """
-        if name is 'sites':
-            return [f for f in self._data.values()
-                    if f.properties['subtype'] == 'site']
-        elif name is 'mountpoints':
-            return [f for f in self._data.values()
-                    if f.properties['subtype'] == 'mountpoint']
-        elif name is 'links':
-            return [f for f in self._data.values()
-                    if f.properties['subtype'] == 'link']
-        elif name is 'all':
-            return [f for f in self._data.values()]
-        else:
-            raise AttributeError
+    @property
+    def links(self):
+        """Return all links in the datastore."""
+        return [f for f in self.values() if isinstance(f, Link)]
 
-    def get(self, key, default=None):
-        """Dict get method.
+    @property
+    def all(self):
+        """Return all sites and links in the datastore."""
+        return [f for f in self.values()]
 
-        Return data requests by wrapping the internal dict.
-        """
-        return self._data.get(key, default)
+    @property
+    def all_connected(self):
+        """Return only sites and links in the datastore that are associated."""
+        adjacencies = utilities.get_adjacencies(
+            edges=[l.as_geojson() for l in self.links],
+            nodes=[s.as_geojson() for s in self.sites])
+        return [s for s in self.sites if s.id in adjacencies]
 
-    def add(self, data):
-        """Validate and add data to the Datastore set.
+    def add(self, raw_data):
+        """Validate and add raw_data to the Datastore set.
 
-        This performs input validation of raw data. self._data should never be
-        accessed directly because it cannot manage data wights during time of
-        input.
-        :param data: data to add to the store
-        :type data: a dict of keys
+        This performs input validation of raw data. The dictionary should never
+        be accessed directly because it cannot manage data wights during time
+        of input.
+        :param raw_data: raw_data to add to the store
+        :type raw_data: a dict of keys
         :returns: 1 if successful and 0 if unsuccessful
         """
 
-        if 'site_id' in data:
-            try:
-                lng = float(data.get('longitude', '0.0'))
-            except:
-                lng = 0.0
-            try:
-                lat = float(data.get('latitude', '0.0'))
-            except:
-                lat = 0.0
-            new_site = geojson.Feature(
-                id=utilities.normalize_node_id(data['site_id']),
-                geometry=geojson.Point((lng, lat)),
-                properties=data)
-            feature = new_site
-        else:
-            feature = data
-
-        identitifier = feature.get('id', 'unknown_id')
-        if not isinstance(feature, geojson.Feature):
-            print('  Failed to load {}: not properly formated'
-                  .format(identitifier))
-            return 0
-
-        if feature.properties.get('subtype', None) not in ['site', 'link']:
-            print('  Failed to load {}: subtype is undefined'
-                  .format(identitifier))
-            return 0
-        data_weight = int(feature.properties.get('data_weight', 0))
-        exsisting_feature = self._data.get(identitifier, None)
-        if exsisting_feature is None:
-            self._data[identitifier] = feature
-            self._weighting[identitifier] = \
-                {f: data_weight for f in feature.properties.keys()}
-
+        if raw_data['data_type'] == 'site':
+            site = self.get(raw_data['site_id'].upper(), Site())
+            self[site.id] = site.update_raw_data(raw_data)
             return 1
+        elif raw_data['data_type'] is 'link':
+            # TODO: Implement better handeling of weighted link data.
+            try:
+                source_site = self[Site.normalize_id(raw_data['source_id'])]
+                destination_site = self[raw_data['destination_id']]
+            except:
+                print('  Source Error:{} is not defined within the data set'
+                      ''.format(raw_data['source_id']))
 
-        else:
-            updates = {}
-            prop_weights = self._weighting[identitifier]
-            for prop_name, prop_val in feature.properties.items():
-                if prop_weights.get(prop_name, -100000) <= data_weight:
-                    prop_weights[prop_name] = data_weight
-                    updates[prop_name] = prop_val
+                print('  Destination Error: {} is not defined within the data '
+                      'set'.format(raw_data['destination_id']))
+            link = Link(source_site=source_site,
+                        destination_site=destination_site)
 
-            exsisting_feature.properties.update(updates)
-            self._data[identitifier] = exsisting_feature
+            self[link.id] = link.update_raw_data(raw_data)
             return 1
+        return 0
 
     def update_all_properties(self):
         """Traverse the DataStore and add/update properties."""
-        adjacencies = utilities.get_adjacencies(edges=self.links,
-                                                nodes=self.sites)
+        adjacencies = utilities.get_adjacencies(
+            edges=[l.as_geojson() for l in self.links],
+            nodes=[s.as_geojson() for s in self.sites])
 
-        for feature in self.all:
-            feature = features.add_length_property(feature)
-            feature = features.remove_unused_properties(feature)
-            feature = features.normalize_precision(feature)
-            if isinstance(feature.geometry, geojson.Point):
-                updates = {'connected_links': ', '.join(
-                    adjacencies[feature.id])}
-                feature.properties.update(updates)
-            self.add(feature)
+        for site in self.all_connected:
+            updates = {'connected_links': ', '.join(adjacencies[site.id])}
+            self[site.id] = site.update_raw_data(updates)
+
+        for link in self.links:
+            try:
+                coords1, coords2 = link.as_geojson().geometry.coordinates
+            except:
+                coords1, coords2 = '0.0,0.0', '0.0,0.0'
+
+            updates = {'link_id': link.id,
+                       'length': utilities.distance(coords1, coords2)}
+            self[link.id] = link.update_raw_data(updates)
 
     def load_geojson_file(self, file_path):
         """Load a FeatureCollection from a single geojson document."""
         loads = 0
         file_name = os.path.basename(file_path)
         with open(file_path, 'r') as f:
-            features = geojson.loads(f.read())
-            if geojson.is_valid(features)['valid'] == 'yes':
-                for feature in features:
+            features1 = geojson.loads(f.read())
+            if geojson.is_valid(features1)['valid'] == 'yes':
+                for feature in features1:
                     loads += self.add(feature)
         print('  Loaded {} sites from {}'.format(loads, file_name))
         print('  Failed to load json file. Def not complete.')
@@ -146,60 +119,36 @@ class Datastore(object):
         file_name = os.path.basename(file_path)
         with open(file_path, 'r') as f:
             reader = csv.DictReader(f)
-            for row in reader:
-                row['data_source'] = file_name
-                row['data_type'] = 'site'
-                row['subtype'] = 'site'
-                if 'data_weight' not in row:
-                    row['data_weight'] = '0'
-                loads += self.add(row)
+            for row_data in reader:
+                row_data['data_source'] = file_name
+                row_data['data_type'] = 'site'
+                loads += self.add(row_data)
 
-            print('  Loaded {} sites from {}'.format(loads, file_name))
+        print('  Loaded {} sites from {}'.format(loads, file_name))
 
-    def load_gv_file(self, file_path, weight=None):
+    def load_gv_file(self, file_path):
         """Load features from single gv document."""
         edge_loads = 0
         node_loads = 0
         try:
             graphs = pydot.graph_from_dot_file(file_path)
         except:
-            print('  Error: Unable to interpret gv file.')
-        graph = graphs[0]
+            print('  Error: Unable to interpret .gv file. Please review.')
 
+        graph = graphs[0]  # TODO: Implement multiple graphs in one file.
         file_name = os.path.basename(file_path)
-
         for node in graph.get_node_list():
             node_loads += 1
-            pass  # TODO: Implement passing site info via graphvis format.
+            # TODO: Implement passing site info via graphvis format.
 
         for edge in graph.get_edge_list():
-            source_id = utilities.normalize_node_id(edge.get_source())
-            destination_id = utilities.normalize_node_id(
-                edge.get_destination())
-            source = self.get(source_id, None)
-            destination = self.get(destination_id, None)
+            data = {
+                'data_type': 'link',
+                'data_source': file_name,
+                'source_id': Site.normalize_id(edge.get_source()),
+                'destination_id': Site.normalize_id(edge.get_destination())}
 
-            if (source is not None) and (destination is not None):
-                line_string = geojson.LineString(
-                    (source.geometry.coordinates,
-                     destination.geometry.coordinates))
-                new_link = geojson.Feature(
-                    id='_'.join(sorted([source.id, destination.id])),
-                    geometry=line_string,
-                    properties={'data_source': file_name,
-                                'subtype': 'link',
-                                'source_id': source_id,
-                                'destination_id': destination_id})
-
-                edge_loads += self.add(new_link)
-
-            else:
-                if source is None:
-                    print('  Source Error:{} is not defined as a site within '
-                          'the data set'.format(source_id))
-                if destination is None:
-                    print('  Destination Error: {} is not defined as a site '
-                          'within the data set'.format(destination_id))
+            edge_loads += self.add(data)
         print('  Loaded {} links from {}'.format(edge_loads, file_name))
 
     def import_all_files(self, folder, files_names):
@@ -215,3 +164,138 @@ class Datastore(object):
             else:
                 print('File format not supported for {}'.format(f))
         print('\nImports complete!')
+
+
+class Site(object):
+    """Atomic object representing a physiscal site.
+
+    A site is a physical place that is approximtly 5m X 5m.
+    """
+    _mandatory_properties = {'bill_of_materials': 'Unknown',
+                             'status': 'Unknown',
+                             'data_type': 'site'}
+
+    def __init__(self):
+        """Initilize the Site object."""
+        self._data_weights = {}
+        self._data = Site._mandatory_properties.copy()
+
+    @staticmethod
+    def normalize_id(site_name):
+        """Normalize site name based on standard convention."""
+        return site_name.upper().strip('"').strip()
+
+    @property
+    def id(self):
+        """Normalized ID of the site.
+
+        This method can be used to clean up eroneouse naming conventions of
+        unique identifiers.
+        """
+        if 'id' in self._data:
+            self._data['site_id'] = self._data['id']
+            self._data.pop('id', None)
+        if 'site_id' in self._data:
+            return Site.normalize_id(self._data['site_id'])
+        return 'unknown'
+
+    @property
+    def latitude(self):
+        """Latitude of the center point of the site with 1m of precision."""
+        try:
+            return float('{:.6f}'.format(float(self._data['latitude'])))
+        except:
+            return 0.0
+
+    @property
+    def longitude(self):
+        """Longitude of the center point of the site with 1m of precision."""
+        try:
+            return float('{:.6f}'.format(float(self._data['longitude'])))
+        except:
+            return 0.0
+
+    def as_geojson(self):
+        """Return the site data as a geoJSON feature object."""
+        properties = {k: v for k, v in self._data.items()
+                      if k not in ['longitude', 'latitude']}
+
+        return geojson.Feature(id=self.id,
+                               geometry=geojson.Point((self.longitude,
+                                                       self.latitude)),
+                               properties=properties)
+
+    def update_raw_data(self, raw_data):
+        """Update the site with the appropriate data.
+
+        Take raw_data weight into consideration for which fields should be
+        updated to new values.
+        """
+        input_data_weight = int(raw_data.get('data_weight', 0))
+        raw_data = {k: v for k, v in raw_data.items() if v != ''}
+        for (column_name, value) in raw_data.iteritems():
+            # Normalize all input data fields.
+            column_name = column_name.lower().replace(' ', '_').strip()
+
+            if input_data_weight >= self._data_weights.get(column_name, 0):
+                self._data_weights[column_name] = input_data_weight
+                self._data.update({column_name: value})
+
+        return self
+
+
+class Link(object):
+    """Atomic link object.
+
+    This object represents a link between two sites.
+    """
+    _mandatory_properties = {'status': 'unknown',
+                             'source_id': 'unknown',
+                             'destination_id': 'unknown'}
+
+    def __init__(self, source_site, destination_site):
+        """Initilize the Link object."""
+        self._data_weights = {}
+        self._data = Link._mandatory_properties.copy()
+        self._source_site, self._destination_site = \
+            sorted([source_site, destination_site], key=lambda x: x.id)
+
+    @property
+    def id(self):
+        return '{}_{}'.format(self._source_site.id, self._destination_site.id)
+
+    def as_geojson(self):
+        """Return the link data as a geoJSON feature object."""
+
+        properties = {k: v for k, v in self._data.items()
+                      if k not in ['longitude', 'latitude']}
+
+        properties.update({'source_id': self._source_site.id,
+                           'destination_id': self._destination_site.id})
+
+        line = geojson.LineString(((self._source_site.longitude,
+                                    self._source_site.latitude),
+                                   (self._destination_site.longitude,
+                                    self._destination_site.latitude)))
+
+        return geojson.Feature(id=self.id,
+                               geometry=line,
+                               properties=properties)
+
+    def update_raw_data(self, raw_data):
+        """Update the link with the appropriate data.
+
+        Take raw_data weight into consideration for which fields should be
+        updated to new values.
+        """
+        input_data_weight = int(raw_data.get('data_weight', 0))
+        raw_data = {k: v for k, v in raw_data.items() if v != ''}
+        for (column_name, value) in raw_data.iteritems():
+            # Normalize all input data fields.
+            column_name = column_name.lower().replace(' ', '_').strip()
+
+            if input_data_weight >= self._data_weights.get(column_name, 0):
+                self._data_weights[column_name] = input_data_weight
+                self._data.update({column_name: value})
+
+        return self
