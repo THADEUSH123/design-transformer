@@ -86,31 +86,36 @@ def design_analysis_report(sites, links):
 
     avg_links_per_site = float(len(links))/float(len(sites)) * 2
 
-    link_lengths = []
-    for link in links:
-        link_length = link.properties['length']
-        link_lengths.append(link_length)
+    link_lengths = [(link.id, link.properties['length']) for link in links]
+    link_lengths.sort(key=lambda x: x[1])
 
-    num_short_links = len([l for l in link_lengths if l < 100 and l > 0])
-    num_med_links = len([l for l in link_lengths if l < 175 and l > 100])
-    num_long_links = len([l for l in link_lengths if l > 175])
+    short_links = [l for l in links if l.properties['length'] < 100 and
+                   l.properties['length'] > 0]
+
+    med_links = [l for l in links if l.properties['length'] < 175 and
+                 l.properties['length'] > 100]
+
+    long_links = [l for l in links if l.properties['length'] > 175]
 
     return ('\n==Design Analysis==\n'
             '  Average of {avg_links_per_site:.2f} links per site.\n'
             '  Breakdown of link connectivity per site:\n'
             '{link_connectivity_counts}\n'
-            '  {longest_link} meters is the longest link.\n'
-            '  {shortest_link} meters is the shortest link.\n'
-            '  {num_short_links} links are shorter than 100 meters.\n'
-            '  {num_med_links} links are 100 to 175 meters.\n'
-            '  {num_long_links} links are longer than 175 meters.\n'
+            '  "{longest_link}" is the longest link at {longest_link_len}m.\n'
+            '  "{shortest_link}" is the shortest link at {shortest_link_len}m.'
+            '\n\n'
+            '  {num_short_links} links are shorter than 100m.\n'
+            '  {num_med_links} links are 100m to 175m.\n'
+            '  {num_long_links} links are longer than 175m.\n'
             ''.format(link_connectivity_counts=link_count_display,
                       avg_links_per_site=avg_links_per_site,
-                      longest_link=max(link_lengths),
-                      shortest_link=min(link_lengths),
-                      num_short_links=num_short_links,
-                      num_med_links=num_med_links,
-                      num_long_links=num_long_links))
+                      longest_link_len=link_lengths[-1][1],
+                      longest_link=link_lengths[-1][0],
+                      shortest_link_len=link_lengths[0][1],
+                      shortest_link=link_lengths[0][0],
+                      num_short_links=len(short_links),
+                      num_med_links=len(med_links),
+                      num_long_links=len(long_links)))
 
 
 def proximity_issue_report(sites, links):
@@ -148,7 +153,7 @@ def material_requirements_report(sites):
     sites_missing_data = []
 
     for site in sites:
-        if 'bill_of_materials' not in site.properties:
+        if site.properties['bill_of_materials'].lower() == 'unknown':
             sites_missing_data.append(site.id)
             continue
         site_bom = site.properties['bill_of_materials'].lower()
@@ -161,14 +166,15 @@ def material_requirements_report(sites):
             complete_bom['primary_devices'] += 1
 
     return ('\n==Material Requirements==\n'
+            'This section includes information based on what was defined in '
+            'the "bill_of_materials" field of the input data set.\n'
+            '{num_sites_missing_data} of {total_sites} sites ARE MISSING '
+            'this data. This will affect results.\n\n'
             '{primary_devices} primary devices required.\n'
             '{secondary_devices} secondary devices required.\n'
             '{client_devices} client node devices required.\n'
             '{odroids} odroid devices required.\n\n'
-            '**This report only includes information for sites with data '
-            'included and the following sites do not have a "bill_of_materials"'
-            ' field defining a hardware BOM.\n {num_sites_missing_data}'
-            ' of {total_sites} sites are MISSING this data.'
+
             ''.format(primary_devices=complete_bom['primary_devices'],
                       secondary_devices=complete_bom['secondary_devices'],
                       client_devices=complete_bom['client_devices'],
@@ -226,7 +232,10 @@ def export_to_kml(sites, links):
         """Convert a dictionary to ExtendedData/Data elements"""
         edata = KML.ExtendedData()
         for key, value in datadict.iteritems():
-            edata.append(KML.Data(KML.value(value), name=key))
+            try:
+                edata.append(KML.Data(KML.value(value), name=key))
+            except:
+                print('Unable to add {}=>{} to object.'.format(key, value))
         return edata
 
     def makeFolder(name, placemarks):
