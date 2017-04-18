@@ -58,25 +58,28 @@ class Datastore(dict):
         :type raw_data: a dict of keys
         :returns: 1 if successful and 0 if unsuccessful
         """
-
         if raw_data['data_type'] == 'site':
-            site = self.get(raw_data['site_id'].upper(), Site())
+            site = self.get(raw_data.get('site_id', 'unknown').upper(), Site())
             self[site.id] = site.update_raw_data(raw_data)
             return 1
         elif raw_data['data_type'] is 'link':
             # TODO: Implement better handeling of weighted link data.
             try:
                 source_site = self[Site.normalize_id(raw_data['source_id'])]
-                destination_site = self[raw_data['destination_id']]
             except:
                 print('  Source Error:{} is not defined within the data set'
                       ''.format(raw_data['source_id']))
+                return 0
+            try:
+                destination_site = self[raw_data['destination_id']]
 
+            except:
                 print('  Destination Error: {} is not defined within the data '
                       'set'.format(raw_data['destination_id']))
+                return 0
+
             link = Link(source_site=source_site,
                         destination_site=destination_site)
-
             self[link.id] = link.update_raw_data(raw_data)
             return 1
         return 0
@@ -153,7 +156,8 @@ class Datastore(dict):
 
     def import_all_files(self, folder, files_names):
         """Wrapper function to import all provided files."""
-        for f in sorted(files_names, key=lambda x: x.split("."))[::-1]:
+        files_names.sort(key=lambda f: os.path.splitext(f)[1])
+        for f in files_names:
             path = os.path.join(folder, f)
             if path.endswith('.csv'):
                 self.load_csv_file(path)
@@ -171,6 +175,7 @@ class Site(object):
 
     A site is a physical place that is approximtly 5m X 5m.
     """
+
     _mandatory_properties = {'bill_of_materials': 'Unknown',
                              'status': 'Unknown',
                              'data_type': 'site'}
