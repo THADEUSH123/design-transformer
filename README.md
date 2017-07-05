@@ -3,7 +3,7 @@
 This repo contains tooling to manage the transformation of planning and design data of a terragraph deployment. It contains data and a Python framework for storing and manipulating deployment data. Number of files has no impact on the script. Arbitrarily, the tool could consume 1000 files and aggregate/consolidate the data.
 
 
-##Data Input
+## Data Input
 There are three input formats this tooling supports. This tooling allows a user to visualize and consume arbitrary site and link data in aggregate. The tooling can consume an arbitrary number of the above formatted text files and output in a standardized output.
 
 1. .csv files[(Comma Separated Delimiter Format)](https://en.wikipedia.org/wiki/CSV): contain a list of attributes of sites (lat/long mandatory).
@@ -13,7 +13,7 @@ There are three input formats this tooling supports. This tooling allows a user 
 3. .geojson/json[(GeoJSON format)](https://en.wikipedia.org/wiki/GeoJSON): can contain any geospatial data.
 
 
-###CSV Input File Details
+### CSV Input File Details
 The csv format currently only supports site data. That data can have any arbitrary name and is defined by the horizontal column names.
 
 **site_id** column
@@ -41,7 +41,7 @@ site_id,   latitude,       longitude,       data_weight,    description,     oth
 12M541,    37.33251834,    -121.8836879,    34,             S 4TH ST 345,    Some value
 ```
 
-###GV Input File Details
+### GV Input File Details
 
 All connections in gv files relate to a **site_id** defined in other files.  
 
@@ -56,11 +56,11 @@ graph example_format {
 ```
 The above example asserts that site 12L198 has a link to 12L197. For this example to properly associate the data, both 12L198 and 12L197 must be a defined site_id in at least one file. The tooling will provide feedback if any site is not known for links defined in the .gv file.
 
-###GeoJSON Input File Details
+### GeoJSON Input File Details
 This is not well build and will likely break because error checking is not very robust for this format. Recommend not using this unless you are certain that the
 
 
-##Data Output
+## Data Output
 The tool outputs several files in various formats into an export directory. Within that directory, files will be exported to a date specific directory(e.g. files would be placed in "exports/01-02-2017/"" for an export on January 1st).
 
 The file output is:
